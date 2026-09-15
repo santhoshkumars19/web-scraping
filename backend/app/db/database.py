@@ -60,7 +60,14 @@ def create_engine_and_factory(database_url: str | None = None) -> AsyncEngine:
     """
     global _engine, _async_session_factory
 
-    url = database_url or settings.DATABASE_URL
+    raw_url = database_url or settings.DATABASE_URL
+    url = raw_url.strip()
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgresql://") and "+asyncpg" not in url:
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif url.startswith("sqlite://") and "+aiosqlite" not in url:
+        url = url.replace("sqlite://", "sqlite+aiosqlite://", 1)
 
     _engine = create_async_engine(
         url,

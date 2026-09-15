@@ -133,6 +133,20 @@ class Settings(BaseSettings):
 
     # ── Validators ─────────────────────────────────────────────────
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def normalize_database_url(cls, v: Any) -> str:
+        """Normalize database URL for async drivers (e.g. Render / Heroku postgres://)."""
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("postgres://"):
+                return v.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif v.startswith("postgresql://") and "+asyncpg" not in v:
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            elif v.startswith("sqlite://") and "+aiosqlite" not in v:
+                return v.replace("sqlite://", "sqlite+aiosqlite://", 1)
+        return v
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:

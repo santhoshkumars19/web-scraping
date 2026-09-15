@@ -51,8 +51,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         settings.APP_VERSION,
         settings.ENVIRONMENT,
     )
-    create_engine_and_factory()
+    engine = create_engine_and_factory()
     logger.info("Database engine initialised.")
+
+    # Automatically create missing database tables on fresh deployments
+    try:
+        import app.models  # noqa: F401 - register models with Base
+        from app.db.base import Base
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database schema verified / created successfully.")
+    except Exception as dbe:
+        logger.warning("Database schema creation notice: %s", dbe)
 
     yield  # Application runs here
 
