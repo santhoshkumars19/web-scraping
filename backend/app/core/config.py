@@ -166,6 +166,15 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"ENVIRONMENT must be one of {valid_envs}, got: {self.ENVIRONMENT!r}"
             )
+
+        # Automatically inherit cloud Redis URL for Celery if Celery is on default localhost
+        if self.REDIS_URL and "localhost:6379" not in self.REDIS_URL:
+            if "localhost:6379" in self.CELERY_BROKER_URL:
+                self.CELERY_BROKER_URL = self.REDIS_URL
+            if "localhost:6379" in self.CELERY_RESULT_BACKEND:
+                base = self.REDIS_URL.rstrip("/0").rstrip("/")
+                self.CELERY_RESULT_BACKEND = f"{base}/1" if not base.endswith("/1") else base
+
         return self
 
     # ── Convenience helpers ────────────────────────────────────────
