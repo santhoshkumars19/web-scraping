@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────
+# LeadScout Backend — Foundation Requirements
+# ─────────────────────────────────────────────
+# NOTE: Versions unpinned for Python 3.14 compatibility.
+# Pin exact versions for production deployments.
+
+# Web Framework
+fastapi>=0.115.4
+uvicorn[standard]>=0.32.0
+
+# Pydantic (uses pydantic-core 2.49+ which ships Python 3.14 wheels)
+pydantic>=2.11.0
+pydantic-settings>=2.6.1
+email-validator>=2.2.0
+
+# Database
+sqlalchemy>=2.0.36
+asyncpg>=0.31.0
+alembic>=1.13.3
+
+# HTTP client (used in tests)
+httpx>=0.27.2
+
+# Testing
+pytest>=8.3.3
+pytest-asyncio>=0.24.0
+anyio>=4.0.0
+aiosqlite>=0.20.0
+
+# Utilities
+python-dotenv>=1.0.1
+
+# Crawler & HTML parsing (Step 5)
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+playwright>=1.40.0
+
+# Extraction Engine (Step 6)
+phonenumbers>=8.13.0
+
+# Background Workers & Task Queue (Step 9)
+celery>=5.4.0
+redis>=5.0.0
+
+# Export Engine (Step 12)
+openpyxl>=3.1.0
+
+# Authentication & Security (Step 13)
+argon2-cffi>=23.1.0
+pyjwt>=2.9.0

@@ -1,26 +1,361 @@
 @import "tailwindcss";
 
+@theme {
+  /* ---- Plus Jakarta Sans font variables (Matching Senti / Kapita Reference) ---- */
+  --font-sans: var(--font-plus-jakarta), "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: var(--font-plus-jakarta), "Plus Jakarta Sans", sans-serif;
+  --font-inter: var(--font-plus-jakarta), "Plus Jakarta Sans", sans-serif;
+
+  /* ---- Radius ---- */
+  --radius: 0.75rem;
+
+  /* ---- Tailwind v4 Color Utilities (Prefix with --color- to generate bg-*, text-*, border-*) ---- */
+  --color-background: #F4F3EA;
+  --color-foreground: #0E0E0E;
+
+  --color-card: #FFFFFF;
+  --color-card-foreground: #0E0E0E;
+
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #0E0E0E;
+
+  --color-primary: #BE0B31;
+  --color-primary-foreground: #FFFFFF;
+
+  --color-secondary: #0E0E0E;
+  --color-secondary-foreground: #FFFFFF;
+
+  --color-muted: #EBE8DE;
+  --color-muted-foreground: #5C5A53;
+
+  --color-accent: #EBE8DE;
+  --color-accent-foreground: #0E0E0E;
+
+  --color-destructive: #BE0B31;
+  --color-destructive-foreground: #FFFFFF;
+
+  --color-border: #E3E0D5;
+  --color-input: #E3E0D5;
+  --color-ring: #BE0B31;
+
+  /* Sidebar Warm Charcoal */
+  --color-sidebar: #141311;
+  --color-sidebar-background: #141311;
+  --color-sidebar-foreground: #B5B2AA;
+  --color-sidebar-border: #242320;
+  --color-sidebar-accent: #242320;
+  --color-sidebar-accent-foreground: #FFFFFF;
+  --color-sidebar-primary: #BE0B31;
+  --color-sidebar-primary-foreground: #FFFFFF;
+  --color-sidebar-ring: #BE0B31;
+
+  /* Status Colors */
+  --color-status-success: #15803D;
+  --color-status-warning: #D97706;
+  --color-status-error: #BE0B31;
+  --color-status-running: #BE0B31;
+
+  /* Warm Editorial Neutral Overrides for Slate */
+  --color-slate-50: #FAF9F5;
+  --color-slate-100: #F3F1E7;
+  --color-slate-200: #E3E0D5;
+  --color-slate-300: #D4CEC3;
+  --color-slate-400: #9E9B93;
+  --color-slate-500: #6B6861;
+  --color-slate-600: #5C5A53;
+  --color-slate-700: #3D3B36;
+  --color-slate-800: #242320;
+  --color-slate-900: #141311;
+  --color-slate-950: #0E0E0E;
+}
+
+/* Light Theme Variables (Default) */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --font-sans: var(--font-plus-jakarta), "Plus Jakarta Sans", sans-serif;
+  --font-heading: var(--font-plus-jakarta), "Plus Jakarta Sans", sans-serif;
+
+  --background: #F4F3EA;
+  --foreground: #0E0E0E;
+  --card: #FFFFFF;
+  --card-foreground: #0E0E0E;
+  --popover: #FFFFFF;
+  --popover-foreground: #0E0E0E;
+  --primary: #BE0B31;
+  --primary-foreground: #FFFFFF;
+  --secondary: #0E0E0E;
+  --secondary-foreground: #FFFFFF;
+  --muted: #EBE8DE;
+  --muted-foreground: #5C5A53;
+  --accent: #EBE8DE;
+  --accent-foreground: #0E0E0E;
+  --destructive: #BE0B31;
+  --destructive-foreground: #FFFFFF;
+  --border: #E3E0D5;
+  --input: #E3E0D5;
+  --ring: #BE0B31;
+  --radius: 0.75rem;
+
+  --sidebar-background: #141311;
+  --sidebar: #141311;
+  --sidebar-foreground: #B5B2AA;
+  --sidebar-border: #242320;
+  --sidebar-accent: #242320;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-primary: #BE0B31;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-ring: #BE0B31;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Dark Theme Variables */
+.dark {
+  --background: #0E0E0D;
+  --foreground: #F4F3EA;
+  --card: #181715;
+  --card-foreground: #F4F3EA;
+  --popover: #181715;
+  --popover-foreground: #F4F3EA;
+  --primary: #BE0B31;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F4F3EA;
+  --secondary-foreground: #0E0E0D;
+  --muted: #24221E;
+  --muted-foreground: #A3A096;
+  --accent: #24221E;
+  --accent-foreground: #F4F3EA;
+  --destructive: #BE0B31;
+  --destructive-foreground: #FFFFFF;
+  --border: #2A2824;
+  --input: #2A2824;
+  --ring: #BE0B31;
+
+  --sidebar-background: #0C0B0A;
+  --sidebar: #0C0B0A;
+  --sidebar-foreground: #A3A096;
+  --sidebar-border: #201E1A;
+  --sidebar-accent: #201E1A;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-primary: #BE0B31;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-ring: #BE0B31;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Global resets */
+*, *::before, *::after {
+  border-color: #E3E0D5;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.dark *, .dark *::before, .dark *::after {
+  border-color: #2A2824;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #F4F3EA !important;
+  color: #0E0E0E !important;
+  font-family: var(--font-plus-jakarta), "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  letter-spacing: -0.018em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark mode html & body */
+html.dark, html.dark body {
+  background-color: #0E0E0D !important;
+  color: #F4F3EA !important;
+}
+
+/* Bold, punchy headings with tight tracking matching the reference letterforms */
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: var(--font-plus-jakarta), "Plus Jakarta Sans", sans-serif !important;
+  letter-spacing: -0.035em;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+h1 {
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  font-weight: 800;
+}
+
+h2 {
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+h3 {
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+/* Guaranteed Rock-Solid Utility Overrides */
+.bg-background {
+  background-color: #F4F3EA !important;
+}
+
+.text-foreground {
+  color: #0E0E0E !important;
+}
+
+.bg-primary {
+  background-color: #BE0B31 !important;
+}
+
+.text-primary {
+  color: #BE0B31 !important;
+}
+
+.text-primary-foreground {
+  color: #FFFFFF !important;
+}
+
+.border-primary {
+  border-color: #BE0B31 !important;
+}
+
+.bg-secondary {
+  background-color: #0E0E0E !important;
+}
+
+.text-secondary {
+  color: #0E0E0E !important;
+}
+
+.text-secondary-foreground {
+  color: #FFFFFF !important;
+}
+
+.border-border {
+  border-color: #E3E0D5 !important;
+}
+
+.bg-muted {
+  background-color: #EBE8DE !important;
+}
+
+.text-muted-foreground {
+  color: #5C5A53 !important;
+}
+
+.bg-sidebar {
+  background-color: #141311 !important;
+}
+
+.border-sidebar-border {
+  border-color: #242320 !important;
+}
+
+.text-sidebar-foreground {
+  color: #B5B2AA !important;
+}
+
+/* Dark Mode Overrides for Core Utility Classes */
+.dark .bg-background {
+  background-color: #0E0E0D !important;
+}
+
+.dark .text-foreground {
+  color: #F4F3EA !important;
+}
+
+.dark .border-border {
+  border-color: #2A2824 !important;
+}
+
+.dark .bg-muted {
+  background-color: #24221E !important;
+}
+
+.dark .text-muted-foreground {
+  color: #A3A096 !important;
+}
+
+.dark .bg-sidebar {
+  background-color: #0C0B0A !important;
+}
+
+.dark .border-sidebar-border {
+  border-color: #201E1A !important;
+}
+
+.dark .text-sidebar-foreground {
+  color: #A3A096 !important;
+}
+
+/* Dark Mode Surface Translations for Existing Layouts */
+.dark .bg-white {
+  background-color: #181715 !important;
+}
+
+.dark .bg-\[\#FAF9F5\] {
+  background-color: #151412 !important;
+}
+
+.dark .bg-\[\#F8F7F0\] {
+  background-color: #1C1A17 !important;
+}
+
+.dark .bg-\[\#F4F3EA\] {
+  background-color: #0E0E0D !important;
+}
+
+.dark .border-\[\#E3E0D5\] {
+  border-color: #2A2824 !important;
+}
+
+.dark .text-\[\#0E0E0E\] {
+  color: #F4F3EA !important;
+}
+
+.dark .text-\[\#5C5A53\] {
+  color: #A3A096 !important;
+}
+
+.dark .hover\:bg-\[\#FAF9F5\]:hover {
+  background-color: #22201C !important;
+}
+
+.dark .hover\:bg-\[\#EBE8DE\]:hover {
+  background-color: #282622 !important;
+}
+
+.dark .bg-\[\#EBE8DE\]\/60 {
+  background-color: #24221E !important;
+}
+
+.dark .bg-slate-50,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/80,
+.dark .bg-slate-50\/60 {
+  background-color: #1C1A17 !important;
+}
+
+.dark .bg-slate-100 {
+  background-color: #24221E !important;
+}
+
+/* ---- Scrollbar (subtle warm webkit) ---- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D4CEC3;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9E9B93;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #3D3B36;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #5C5A53;
 }

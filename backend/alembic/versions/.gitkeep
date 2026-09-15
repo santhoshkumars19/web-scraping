@@ -1,0 +1,4 @@
+"""
+Generic file-based lock.  This is the default lock type if none is
+specified in alembic.ini.  This file does not belong to any revision.
+"""

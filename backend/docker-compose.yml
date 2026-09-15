@@ -1,0 +1,106 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# LeadScout — docker-compose.yml
+#
+# Development-only compose file.
+# Services:
+#   • postgres  — PostgreSQL 16 database
+#   • backend   — FastAPI application
+#
+# ⚠️  Credentials here are for LOCAL DEVELOPMENT ONLY.
+#     Never use these values in staging or production.
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: leadscout_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: leadscout
+      POSTGRES_USER: leadscout
+      POSTGRES_PASSWORD: leadscout
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leadscout -d leadscout"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: leadscout_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data
+
+  # ── FastAPI Backend ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: leadscout_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_NAME: LeadScout
+      APP_VERSION: "1.0.0"
+      DEBUG: "false"
+      ENVIRONMENT: development
+      # Inside Docker, use the service name "postgres" — NOT localhost
+      DATABASE_URL: postgresql+asyncpg://leadscout:leadscout@postgres:5432/leadscout
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      API_PREFIX: /api
+      CORS_ORIGINS: '["http://localhost:3000"]'
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+
+  # ── Celery Worker ───────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: leadscout_worker
+    restart: unless-stopped
+    command: celery -A app.workers.celery_app worker --loglevel=INFO --concurrency=4
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_NAME: LeadScout
+      APP_VERSION: "1.0.0"
+      DEBUG: "false"
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://leadscout:leadscout@postgres:5432/leadscout
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      LOG_LEVEL: INFO
+
+volumes:
+  postgres_data:
+  redis_data:
+
