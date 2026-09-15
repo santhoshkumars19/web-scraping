@@ -45,5 +45,5 @@ USER appuser
 
 EXPOSE 8000
 
-# Run with Uvicorn — host 0.0.0.0 is required inside Docker
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run with Uvicorn — supports dynamic $PORT on Railway/Render/Heroku, falls back to 8000
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
