@@ -51,6 +51,7 @@ celery_app.conf.update(
     task_routes={
         "app.workers.pipeline.run_scraping_pipeline": {"queue": "pipeline"},
         "app.workers.tasks.run_discovery_task": {"queue": "discovery"},
+        "app.workers.tasks.run_official_website_task": {"queue": "discovery"},
         "app.workers.tasks.run_crawl_task": {"queue": "crawl"},
         "app.workers.tasks.run_extraction_task": {"queue": "extraction"},
         "app.workers.tasks.run_cleaning_task": {"queue": "cleaning"},

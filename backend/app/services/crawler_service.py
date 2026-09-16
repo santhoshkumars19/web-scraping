@@ -85,7 +85,7 @@ class CrawlerService:
         task.current_stage = "CRAWLING"
         if not task.started_at:
             task.started_at = datetime.now(timezone.utc)
-        task.progress = max(task.progress, 20)
+        task.progress = max(task.progress, 30)
 
         self.session.add(
             ScrapingLog(
@@ -96,6 +96,45 @@ class CrawlerService:
             )
         )
         await self.session.commit()
+
+        if total_websites == 0:
+            logger.info("[%s] Completed with 0 crawlable websites", task.task_id)
+            self.session.add(
+                ScrapingLog(
+                    task_id=task.id,
+                    level="INFO",
+                    event_type="NO_CRAWLABLE_WEBSITES",
+                    message="Completed with 0 crawlable websites. Advancing to extraction.",
+                )
+            )
+            task.websites_crawled = 0
+            task.current_stage = "EXTRACTING"
+            task.progress = 50
+            await self.session.commit()
+
+            try:
+                from app.realtime.publisher import get_event_publisher
+                await get_event_publisher().publish_stage_changed(
+                    task.task_id,
+                    stage="EXTRACTING",
+                    progress=50,
+                    status=task.status,
+                )
+            except Exception as pe:
+                logger.debug("Realtime publish failed: %s", pe)
+
+            return TaskCrawlSummary(
+                task_id=task.task_id,
+                total_websites=0,
+                websites_crawled=0,
+                failed_websites=0,
+                blocked_websites=0,
+                total_pages_stored=0,
+                playwright_total=0,
+                duration_seconds=time.monotonic() - start_time,
+                status="Completed with 0 crawlable websites",
+                next_stage="EXTRACTING",
+            )
 
         try:
             from app.realtime.publisher import get_event_publisher

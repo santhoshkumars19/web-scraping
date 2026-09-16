@@ -329,9 +329,9 @@ class DiscoveryService:
         task.websites_found += websites_new
         task.duplicates_removed += duplicates_removed
 
-        # Transition stage to FINDING_WEBSITES (ready for Step 5 crawling)
+        # Transition stage to FINDING_WEBSITES (ready for Step 3 official website identification)
         task.current_stage = "FINDING_WEBSITES"
-        task.progress = 15
+        task.progress = 20
 
         self.session.add(
             ScrapingLog(

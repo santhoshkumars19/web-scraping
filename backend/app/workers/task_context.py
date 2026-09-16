@@ -120,11 +120,16 @@ async def _execute_stage_in_session(
         # ── 3. Stage Started Log & Realtime Event ─────────────────────────────
         task.current_stage = stage_name
         stage_progress_floors = {
-            "DISCOVERING": 5,
-            "CRAWLING": 20,
-            "EXTRACTING": 55,
-            "CLEANING": 75,
-            "VERIFYING": 85,
+            "CREATING_TASK": 0,
+            "DISCOVERING": 10,
+            "FINDING_WEBSITES": 20,
+            "CRAWLING": 30,
+            "EXTRACTING": 50,
+            "CLEANING": 65,
+            "DEDUPLICATING": 75,
+            "VERIFYING": 82,
+            "SAVING": 90,
+            "COMPLETED": 100,
         }
         if stage_name in stage_progress_floors:
             task.progress = max(task.progress, stage_progress_floors[stage_name])

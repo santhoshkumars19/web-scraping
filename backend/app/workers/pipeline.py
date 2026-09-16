@@ -18,6 +18,7 @@ from app.workers.tasks import (
     run_discovery_task,
     run_extraction_task,
     run_finalize_task,
+    run_official_website_task,
     run_verification_task,
 )
 
@@ -29,6 +30,8 @@ def build_pipeline_chain(task_id: str) -> chain:
 
     Flow:
         Discovery (discovery)
+        ↓
+        Official Website Identification (discovery)
         ↓
         Crawl (crawl)
         ↓
@@ -42,6 +45,7 @@ def build_pipeline_chain(task_id: str) -> chain:
     """
     return chain(
         run_discovery_task.si(task_id),
+        run_official_website_task.si(task_id),
         run_crawl_task.si(task_id),
         run_extraction_task.si(task_id),
         run_cleaning_task.si(task_id),

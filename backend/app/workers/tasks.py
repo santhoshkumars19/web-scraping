@@ -19,6 +19,7 @@ from app.jobs.crawl_job import run_crawl
 from app.jobs.discovery_job import run_discovery
 from app.jobs.extraction_job import run_extraction
 from app.jobs.finalization_job import run_finalize
+from app.jobs.official_website_job import run_official_website
 from app.jobs.verification_job import run_verification
 from app.workers.celery_app import celery_app
 from app.workers.task_context import (
@@ -41,9 +42,11 @@ TRANSIENT_ERRORS = (OperationalError, ConnectionError, TimeoutError, RedisError)
 )
 def run_discovery_task(self, task_id: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
     """Execute Discovery Engine stage for a task."""
-    logger.info("Celery task started: run_discovery_task for %s", task_id)
+    logger.info("[%s] discovery started", task_id)
     try:
-        return run_worker_stage(run_discovery, task_id, "DISCOVERING")
+        res = run_worker_stage(run_discovery, task_id, "DISCOVERING")
+        logger.info("[%s] discovery completed", task_id)
+        return res
     except (TaskCancelledException, TaskAlreadyFailedException) as e:
         logger.info("Discovery task halted for %s: %s", task_id, e)
         return {"task_id": task_id, "status": "HALTED", "reason": str(e)}
@@ -63,6 +66,38 @@ def run_discovery_task(self, task_id: str, *args: Any, **kwargs: Any) -> dict[st
 
 @celery_app.task(
     bind=True,
+    name="app.workers.tasks.run_official_website_task",
+    queue="discovery",
+    max_retries=settings.CELERY_MAX_RETRIES,
+    acks_late=True,
+)
+def run_official_website_task(self, task_id: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
+    """Execute Official Website identification and verification stage for a task."""
+    logger.info("[%s] official website stage started", task_id)
+    try:
+        res = run_worker_stage(run_official_website, task_id, "FINDING_WEBSITES")
+        logger.info("[%s] official website stage completed", task_id)
+        logger.info("[%s] crawl task queued", task_id)
+        return res
+    except (TaskCancelledException, TaskAlreadyFailedException) as e:
+        logger.info("Official website stage halted for %s: %s", task_id, e)
+        return {"task_id": task_id, "status": "HALTED", "reason": str(e)}
+    except TRANSIENT_ERRORS as exc:
+        logger.warning(
+            "Transient error in official website finding for task %s (attempt %d/%d): %s",
+            task_id,
+            self.request.retries + 1,
+            self.max_retries,
+            exc,
+        )
+        raise self.retry(exc=exc, countdown=2 ** self.request.retries)
+    except Exception as exc:
+        logger.error("Permanent error in official website finding for task %s: %s", task_id, exc)
+        raise
+
+
+@celery_app.task(
+    bind=True,
     name="app.workers.tasks.run_crawl_task",
     queue="crawl",
     max_retries=settings.CELERY_MAX_RETRIES,
@@ -70,9 +105,11 @@ def run_discovery_task(self, task_id: str, *args: Any, **kwargs: Any) -> dict[st
 )
 def run_crawl_task(self, task_id: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
     """Execute Website Crawler stage for a task."""
-    logger.info("Celery task started: run_crawl_task for %s", task_id)
+    logger.info("[%s] crawl started", task_id)
     try:
-        return run_worker_stage(run_crawl, task_id, "CRAWLING")
+        res = run_worker_stage(run_crawl, task_id, "CRAWLING")
+        logger.info("[%s] crawl completed", task_id)
+        return res
     except (TaskCancelledException, TaskAlreadyFailedException) as e:
         logger.info("Crawl task halted for %s: %s", task_id, e)
         return {"task_id": task_id, "status": "HALTED", "reason": str(e)}
