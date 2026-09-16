@@ -43,6 +43,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Switch to non-root user
 USER appuser
 
+EXPOSE 8080
 EXPOSE 8000
 
 # Run with Uvicorn — supports dynamic $PORT on Railway/Render/Heroku, falls back to 8000
