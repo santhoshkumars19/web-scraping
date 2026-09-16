@@ -49,15 +49,17 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # ── Crawler Configuration (Step 5) ─────────────────────────────
-    HTTP_TIMEOUT_SECONDS: float = 15.0
-    PLAYWRIGHT_TIMEOUT_SECONDS: float = 20.0
-    CRAWL_DELAY_SECONDS: float = 1.0
-    MAX_RETRIES: int = 2
+    HTTP_TIMEOUT_SECONDS: float = 8.0
+    PLAYWRIGHT_TIMEOUT_SECONDS: float = 15.0
+    CRAWL_DELAY_SECONDS: float = 0.5
+    MAX_RETRIES: int = 1
     MAX_REDIRECTS: int = 5
     MAX_RESPONSE_SIZE_MB: int = 10
     CRAWLER_USER_AGENT: str = "LeadScoutBot/1.0 (+https://leadscout.example/bot)"
     ALLOW_SUBDOMAINS: bool = False
-    PLAYWRIGHT_ENABLED: bool = True
+    PLAYWRIGHT_ENABLED: bool = False
+    WEBSITE_CRAWL_TIMEOUT_SECONDS: float = 30.0
+    CRAWLER_CONCURRENCY: int = 3
 
     # ── Redis & Celery (Step 9) ────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379/0"

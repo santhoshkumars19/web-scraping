@@ -1,2 +1,2 @@
 web: python run.py
-worker: celery -A app.workers.celery_app.celery_app worker --loglevel=info --pool=solo
+worker: celery -A app.workers.celery_app.celery_app worker -Q pipeline,discovery,crawl,extraction,cleaning,verification --loglevel=info --pool=solo

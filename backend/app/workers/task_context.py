@@ -118,6 +118,17 @@ async def _execute_stage_in_session(
                 logger.debug("Realtime publish failed for task %s started event: %s", task_id, pe)
 
         # ── 3. Stage Started Log & Realtime Event ─────────────────────────────
+        task.current_stage = stage_name
+        stage_progress_floors = {
+            "DISCOVERING": 5,
+            "CRAWLING": 20,
+            "EXTRACTING": 55,
+            "CLEANING": 75,
+            "VERIFYING": 85,
+        }
+        if stage_name in stage_progress_floors:
+            task.progress = max(task.progress, stage_progress_floors[stage_name])
+
         session.add(
             ScrapingLog(
                 task_id=task.id,

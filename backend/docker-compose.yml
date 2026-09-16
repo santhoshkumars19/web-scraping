@@ -83,7 +83,7 @@ services:
       dockerfile: Dockerfile
     container_name: leadscout_worker
     restart: unless-stopped
-    command: celery -A app.workers.celery_app worker --loglevel=INFO --concurrency=4
+    command: celery -A app.workers.celery_app.celery_app worker -Q pipeline,discovery,crawl,extraction,cleaning,verification --loglevel=INFO --concurrency=4
     depends_on:
       postgres:
         condition: service_healthy

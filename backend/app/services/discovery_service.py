@@ -8,8 +8,10 @@ persists records to PostgreSQL, and updates task metrics and logs.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -123,10 +125,60 @@ class DiscoveryService:
                 errors=errors,
             )
 
-        # ── 3. Database Persistence (Organizations, Websites, Links) ───────────
+        # ── 3. Database Persistence & Candidate Website Probing ─────────────────
+        task.current_stage = "FINDING_WEBSITES"
+        task.progress = 10
+        await self.session.commit()
+
+        try:
+            from app.realtime.publisher import get_event_publisher
+            await get_event_publisher().publish_stage_changed(
+                task.task_id,
+                stage="FINDING_WEBSITES",
+                progress=10,
+                status=task.status,
+            )
+        except Exception as pe:
+            logger.debug("Realtime publish failed for FINDING_WEBSITES stage: %s", pe)
+
         orgs_created = 0
         orgs_reused = 0
         websites_new = 0
+
+        # Concurrently probe reachability for all candidates with non-portal URLs
+        reach_sem = asyncio.Semaphore(10)
+        fixtures_enabled = getattr(settings, "DISCOVERY_ENABLE_FIXTURES", False)
+
+        async def _check_cand_reachability(cand_item: any, shared_client: httpx.AsyncClient) -> tuple[str, any]:
+            cand_url_str = (cand_item.url or "").strip()
+            if (
+                not cand_url_str
+                or cand_url_str.startswith("https://www.openstreetmap.org")
+                or cand_url_str.startswith("fixture://")
+            ):
+                return cand_url_str, None
+            if fixtures_enabled and getattr(cand_item, "source", None) == "FIXTURE":
+                return cand_url_str, None
+            try:
+                async with reach_sem:
+                    res = await validate_website_reachability(cand_url_str, timeout=4.0, client=shared_client)
+                    return cand_url_str, res
+            except Exception as e:
+                logger.debug("Reachability probe failed for %s: %s", cand_url_str, e)
+                return cand_url_str, None
+
+        reachability_lookup: dict[str, any] = {}
+        async with httpx.AsyncClient(
+            headers={"User-Agent": settings.CRAWLER_USER_AGENT},
+            follow_redirects=True,
+            timeout=5.0,
+        ) as probe_client:
+            probe_tasks = [_check_cand_reachability(c, probe_client) for c in candidates if (c.url or "").strip()]
+            if probe_tasks:
+                probe_results = await asyncio.gather(*probe_tasks, return_exceptions=True)
+                for item in probe_results:
+                    if isinstance(item, tuple) and item[1] is not None:
+                        reachability_lookup[item[0]] = item[1]
 
         for cand in candidates:
             # Check if organization already exists by domain or name
@@ -205,18 +257,17 @@ class DiscoveryService:
             is_official = getattr(cand, "is_official_candidate", False)
 
             if cand_url and not cand_url.startswith("https://www.openstreetmap.org") and not cand_url.startswith("fixture://"):
-                fixtures_enabled = getattr(settings, "DISCOVERY_ENABLE_FIXTURES", False)
                 if fixtures_enabled and cand.source == "FIXTURE":
                     website_url_to_save = cand_url
                     website_domain = cand.domain
                 else:
-                    reachability = await validate_website_reachability(cand_url, timeout=6.0)
-                    if reachability.is_reachable:
+                    reachability = reachability_lookup.get(cand_url)
+                    if reachability and reachability.is_reachable:
                         website_url_to_save = reachability.final_url or reachability.normalized_url
                         website_domain = reachability.domain or cand.domain
                         is_official = True
                     else:
-                        logger.info("Candidate website unreachable for %s (%s): %s", cand.name, cand_url, reachability.error)
+                        logger.info("Candidate website unreachable for %s (%s)", cand.name, cand_url)
             elif cand_url.startswith("fixture://") and getattr(settings, "DISCOVERY_ENABLE_FIXTURES", False):
                 website_url_to_save = cand_url
                 website_domain = cand.domain
