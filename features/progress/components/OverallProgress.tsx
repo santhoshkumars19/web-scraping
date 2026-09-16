@@ -13,7 +13,7 @@ export function OverallProgress({ task }: OverallProgressProps) {
   const currentStageInfo = STAGES[currentStageIndex] || STAGES[0];
 
   return (
-    <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
+    <div className="rounded-xl sm:rounded-2xl border border-border bg-white p-4 sm:p-6 shadow-sm">
       {/* Header & Percentage */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
         <div>

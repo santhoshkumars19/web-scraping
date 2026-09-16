@@ -17,7 +17,7 @@ function TaskRow({ task }: { task: RecentTask }) {
   return (
     <tr className="group border-b border-border last:border-0 hover:bg-[#FAF9F5] transition-colors">
       {/* Task ID */}
-      <td className="py-3 pl-4 pr-3 sm:pl-6">
+      <td className="py-3 pl-4 pr-3 sm:pl-6 whitespace-nowrap">
         <Link
           href={`/tasks/${task.taskId}/progress`}
           className="font-mono text-xs font-semibold text-primary hover:underline"
@@ -44,7 +44,7 @@ function TaskRow({ task }: { task: RecentTask }) {
       </td>
 
       {/* Status */}
-      <td className="px-3 py-3">
+      <td className="px-3 py-3 whitespace-nowrap">
         <StatusBadge status={task.status} />
       </td>
 
@@ -54,8 +54,8 @@ function TaskRow({ task }: { task: RecentTask }) {
       </td>
 
       {/* Actions */}
-      <td className="py-3 pl-3 pr-4 sm:pr-6">
-        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <td className="py-3 pl-3 pr-4 sm:pr-6 whitespace-nowrap">
+        <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <Button variant="ghost" size="sm" asChild className="h-7 gap-1.5 text-xs">
             <Link href={`/tasks/${task.taskId}/progress`}>
               <Eye className="h-3.5 w-3.5" />
@@ -150,7 +150,7 @@ export function RecentTasksTable({ tasks: propTasks, loading }: RecentTasksTable
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-border bg-[#F8F7F0]">
-                <th className="py-2.5 pl-4 pr-3 text-xs font-semibold text-muted-foreground sm:pl-6">
+                <th className="py-2.5 pl-4 pr-3 text-xs font-semibold text-muted-foreground sm:pl-6 whitespace-nowrap">
                   Task ID
                 </th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground">
@@ -162,13 +162,13 @@ export function RecentTasksTable({ tasks: propTasks, loading }: RecentTasksTable
                 <th className="hidden px-3 py-2.5 text-xs font-semibold text-muted-foreground lg:table-cell">
                   Results
                 </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground">
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
                   Status
                 </th>
                 <th className="hidden px-3 py-2.5 text-xs font-semibold text-muted-foreground xl:table-cell">
                   Created
                 </th>
-                <th className="py-2.5 pl-3 pr-4 text-right text-xs font-semibold text-muted-foreground sm:pr-6">
+                <th className="py-2.5 pl-3 pr-4 text-right text-xs font-semibold text-muted-foreground sm:pr-6 whitespace-nowrap">
                   Actions
                 </th>
               </tr>

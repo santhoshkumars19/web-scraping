@@ -135,10 +135,11 @@ export function DashboardView() {
               Browse Leads
             </Link>
           </Button>
-          <PrimaryButton asChild className="h-10 px-5">
+          <PrimaryButton asChild className="h-10 px-4 sm:px-5">
             <Link href="/tasks/new">
               <Plus className="h-4 w-4 mr-1.5" />
-              New Scraping Task
+              <span className="hidden sm:inline">New Scraping Task</span>
+              <span className="sm:hidden">New Task</span>
             </Link>
           </PrimaryButton>
         </div>

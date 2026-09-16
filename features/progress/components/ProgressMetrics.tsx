@@ -77,23 +77,29 @@ export function ProgressMetrics({ task }: ProgressMetricsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
       {metrics.map((m) => {
         const Icon = m.icon;
         return (
           <div
             key={m.label}
-            className="rounded-2xl border border-border bg-white p-4 shadow-sm flex flex-col justify-between hover:border-border/80 transition-colors"
+            className="rounded-xl sm:rounded-2xl border border-border bg-white p-3 sm:p-4 shadow-2xs flex flex-col justify-between hover:border-border/80 transition-colors"
           >
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-xs font-medium text-muted-foreground">{m.label}</span>
-              <div className={`p-2 rounded-xl shrink-0 ${m.color}`}>
-                <Icon className="h-4 w-4" />
+            <div className="flex items-start justify-between gap-1.5">
+              <span className="text-[11px] sm:text-xs font-medium text-muted-foreground truncate">
+                {m.label}
+              </span>
+              <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl shrink-0 ${m.color}`}>
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </div>
             </div>
-            <div className="mt-3">
-              <div className="text-2xl font-bold tracking-tight text-foreground">{m.value}</div>
-              <p className="mt-0.5 text-xs text-muted-foreground">{m.description}</p>
+            <div className="mt-2 sm:mt-3">
+              <div className="text-lg sm:text-2xl font-bold tracking-tight text-foreground truncate">
+                {m.value}
+              </div>
+              <p className="mt-0.5 text-[10px] sm:text-xs text-muted-foreground truncate sm:whitespace-normal">
+                {m.description}
+              </p>
             </div>
           </div>
         );

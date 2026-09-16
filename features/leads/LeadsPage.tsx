@@ -363,7 +363,8 @@ export function LeadsPage({ initialTaskId }: LeadsPageProps) {
           <PrimaryButton asChild className="h-9 text-xs">
             <Link href="/tasks/new">
               <Plus className="h-4 w-4" />
-              <span>New Scraping Task</span>
+              <span className="hidden sm:inline">New Scraping Task</span>
+              <span className="sm:hidden">New Task</span>
             </Link>
           </PrimaryButton>
         </div>

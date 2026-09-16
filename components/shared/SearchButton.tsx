@@ -252,7 +252,7 @@ export function SearchButton() {
       </Tooltip>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden border-border/80 shadow-2xl">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl rounded-2xl p-0 gap-0 overflow-hidden border-border/80 shadow-2xl">
           <DialogTitle className="sr-only">Global Search</DialogTitle>
 
           {/* Search Header Bar */}
@@ -541,7 +541,7 @@ export function SearchButton() {
 
           {/* Dialog Footer Navigation Keys */}
           <div className="flex items-center justify-between border-t border-border bg-[#F8F7F0] px-4 py-2 text-[11px] text-muted-foreground">
-            <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-3">
               <span className="flex items-center gap-1">
                 <kbd className="rounded border border-border bg-white px-1 font-mono text-[10px]">
                   ↑

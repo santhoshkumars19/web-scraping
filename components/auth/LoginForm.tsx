@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Eye, EyeOff, Loader2, AlertCircle, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -65,13 +65,6 @@ export function LoginForm() {
     }
   };
 
-  // One-click demo credential filler
-  const fillDemoCredentials = () => {
-    setValue("email", "demo@leadscout.app", { shouldValidate: true });
-    setValue("password", "LeadScout123", { shouldValidate: true });
-    setAuthError(null);
-  };
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-xs" noValidate>
       {/* Inline Auth Error */}
@@ -81,21 +74,6 @@ export function LoginForm() {
           <span>{authError}</span>
         </div>
       )}
-
-      {/* Demo Credentials Quick Pill */}
-      <div className="p-2.5 rounded-xl border border-[#BE0B31]/20 bg-[#BE0B31]/5 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[#BE0B31]">
-          <Sparkles className="h-3.5 w-3.5 shrink-0" />
-          <span className="text-[11px] font-medium">Demo: demo@leadscout.app</span>
-        </div>
-        <button
-          type="button"
-          onClick={fillDemoCredentials}
-          className="text-[10px] font-semibold text-[#BE0B31] hover:underline bg-white px-2 py-0.5 rounded-lg border border-[#BE0B31]/20 cursor-pointer"
-        >
-          Autofill
-        </button>
-      </div>
 
       {/* Email Field */}
       <div className="space-y-1.5">

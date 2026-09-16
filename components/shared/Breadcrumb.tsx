@@ -27,39 +27,63 @@ export function Breadcrumb() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
 
+  const currentLabel =
+    segments.length > 0
+      ? getLabel(segments[segments.length - 1])
+      : "Dashboard";
+
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
-      <Link
-        href="/dashboard"
-        className="text-muted-foreground hover:text-foreground transition-colors"
-        aria-label="Home"
+    <div className="flex items-center min-w-0">
+      {/* Mobile compact title */}
+      <div className="flex sm:hidden items-center gap-1.5 text-xs font-semibold text-foreground min-w-0">
+        <span className="truncate max-w-[130px]" title={currentLabel}>
+          {currentLabel}
+        </span>
+      </div>
+
+      {/* Desktop full breadcrumb trail */}
+      <nav
+        aria-label="Breadcrumb"
+        className="hidden sm:flex items-center gap-1.5 text-sm min-w-0 overflow-hidden whitespace-nowrap"
       >
-        <Home className="h-4 w-4" />
-      </Link>
+        <Link
+          href="/dashboard"
+          className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          aria-label="Home"
+        >
+          <Home className="h-4 w-4" />
+        </Link>
 
-      {segments.map((segment, index) => {
-        const href = "/" + segments.slice(0, index + 1).join("/");
-        const isLast = index === segments.length - 1;
-        const label = getLabel(segment);
+        {segments.map((segment, index) => {
+          const href = "/" + segments.slice(0, index + 1).join("/");
+          const isLast = index === segments.length - 1;
+          const label = getLabel(segment);
 
-        return (
-          <span key={href} className="flex items-center gap-1.5">
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
-            {isLast ? (
-              <span className="font-medium text-foreground">{label}</span>
-            ) : (
-              <Link
-                href={href}
-                className={cn(
-                  "text-muted-foreground hover:text-foreground transition-colors"
-                )}
-              >
-                {label}
-              </Link>
-            )}
-          </span>
-        );
-      })}
-    </nav>
+          return (
+            <span key={href} className="flex items-center gap-1.5 min-w-0 shrink-0">
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+              {isLast ? (
+                <span
+                  className="font-medium text-foreground truncate max-w-[140px] md:max-w-[200px]"
+                  title={label}
+                >
+                  {label}
+                </span>
+              ) : (
+                <Link
+                  href={href}
+                  className={cn(
+                    "text-muted-foreground hover:text-foreground transition-colors truncate max-w-[110px] md:max-w-[160px]"
+                  )}
+                  title={label}
+                >
+                  {label}
+                </Link>
+              )}
+            </span>
+          );
+        })}
+      </nav>
+    </div>
   );
 }

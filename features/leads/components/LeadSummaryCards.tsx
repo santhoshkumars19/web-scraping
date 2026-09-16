@@ -61,13 +61,15 @@ export function LeadSummaryCards({
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-      {cards.map((card) => {
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
+      {cards.map((card, idx) => {
         const Icon = card.icon;
         return (
           <div
             key={card.label}
-            className="rounded-2xl border border-border bg-white p-3.5 shadow-2xs hover:border-border/80 transition-colors"
+            className={`rounded-xl sm:rounded-2xl border border-border bg-white p-3 sm:p-3.5 shadow-2xs hover:border-border/80 transition-colors ${
+              idx === 4 ? "col-span-2 sm:col-span-1" : ""
+            }`}
           >
             <div className="flex items-center justify-between gap-1.5">
               <span className="text-xs font-medium text-muted-foreground truncate">

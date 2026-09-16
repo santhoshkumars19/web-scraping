@@ -16,12 +16,12 @@ interface HeaderProps {
 export function Header({ onMobileMenuOpen }: HeaderProps) {
   return (
     <TooltipProvider delayDuration={200}>
-      <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-background px-4 sm:px-6">
+      <header className="flex h-14 shrink-0 items-center gap-2 sm:gap-4 border-b border-border bg-background px-3 sm:px-6">
         {/* Mobile hamburger */}
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden"
+          className="md:hidden shrink-0"
           onClick={onMobileMenuOpen}
           aria-label="Open menu"
         >
@@ -29,7 +29,7 @@ export function Header({ onMobileMenuOpen }: HeaderProps) {
         </Button>
 
         {/* Breadcrumb / page title */}
-        <div className="flex flex-1 items-center min-w-0 gap-4">
+        <div className="flex flex-1 items-center min-w-0 gap-2 sm:gap-4">
           <Breadcrumb />
           <div className="hidden xl:flex items-center gap-2 text-xs font-medium text-muted-foreground border-l border-border/80 pl-4 select-none">
             <span className="h-1.5 w-1.5 rounded-[2px] bg-primary shrink-0" aria-hidden="true" />
@@ -38,23 +38,25 @@ export function Header({ onMobileMenuOpen }: HeaderProps) {
         </div>
 
         {/* Right side actions */}
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
           <SearchButton />
           <NotificationButton />
           <ThemeToggle />
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Help">
-                <HelpCircle className="h-4 w-4" />
-                <span className="sr-only">Help</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Help & Documentation</TooltipContent>
-          </Tooltip>
+          <div className="hidden sm:inline-flex">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Help">
+                  <HelpCircle className="h-4 w-4" />
+                  <span className="sr-only">Help</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Help & Documentation</TooltipContent>
+            </Tooltip>
+          </div>
 
           {/* Divider */}
-          <div className="mx-1 h-5 w-px bg-border" />
+          <div className="hidden sm:block mx-1 h-5 w-px bg-border" />
 
           {/* User menu (compact, header variant) */}
           <div className="hidden sm:block">
