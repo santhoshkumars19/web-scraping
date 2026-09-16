@@ -8,7 +8,7 @@ All secrets and environment-specific values must come from .env — nothing is h
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Union
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -42,9 +42,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./leadscout.db"
 
     # ── CORS ───────────────────────────────────────────────────────
-    # Accepts a JSON array string from the env var, e.g.:
-    #   CORS_ORIGINS='["http://localhost:3000"]'
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    # Accepts JSON array, comma-separated URLs, or a single URL string
+    CORS_ORIGINS: Union[list[str], str] = ["http://localhost:3000"]
 
     # ── Logging ────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"
@@ -147,17 +146,26 @@ class Settings(BaseSettings):
                 return v.replace("sqlite://", "sqlite+aiosqlite://", 1)
         return v
 
-    @field_validator("CORS_ORIGINS", mode="before")
+    @field_validator("CORS_ORIGINS", mode="after")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:
-        """Allow CORS_ORIGINS to be provided as a JSON string or a plain string."""
+        """Allow CORS_ORIGINS to be provided as a JSON string, comma-separated string, or plain URL."""
         if isinstance(v, str):
             v = v.strip()
-            if v.startswith("["):
-                return json.loads(v)
-            # Single-origin shorthand: "http://localhost:3000"
-            return [v]
-        return v
+            if not v:
+                return ["http://localhost:3000"]
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    loaded = json.loads(v)
+                    if isinstance(loaded, list):
+                        return [str(item).strip() for item in loaded if str(item).strip()]
+                except Exception:
+                    pass
+            parts = [part.strip().strip("'\"") for part in v.split(",") if part.strip()]
+            return parts if parts else ["http://localhost:3000"]
+        if isinstance(v, (list, tuple)):
+            return [str(item).strip() for item in v if str(item).strip()]
+        return ["http://localhost:3000"]
 
     @model_validator(mode="after")
     def validate_environment(self) -> "Settings":
