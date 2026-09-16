@@ -126,7 +126,7 @@ class Settings(BaseSettings):
     REQUEST_ID_ENABLED: bool = True
 
     # Trusted hosts (comma-separated, used in production)
-    ALLOWED_HOSTS: str = "localhost,127.0.0.1"
+    ALLOWED_HOSTS: str = "*"
 
     # Docs availability (set to false in production to hide /docs /redoc)
     DOCS_ENABLED: bool = True

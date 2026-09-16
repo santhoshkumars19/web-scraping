@@ -113,6 +113,7 @@ def create_application() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
+        allow_origin_regex=r"https://.*\.railway\.app|https://.*\.up\.railway\.app|https://.*\.vercel\.app|https://.*\.onrender\.com|http://localhost:\d+",
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
@@ -120,6 +121,16 @@ def create_application() -> FastAPI:
 
     # ── Exception handlers ────────────────────────────────────────────────────
     _register_exception_handlers(app)
+
+    # ── Root endpoint for platform health probes ──────────────────────────────
+    @app.get("/", tags=["Health"])
+    async def root_ping() -> dict[str, str]:
+        return {
+            "status": "ok",
+            "service": settings.APP_NAME,
+            "version": settings.APP_VERSION,
+            "docs": "/docs" if settings.DOCS_ENABLED else "disabled",
+        }
 
     # ── API router ────────────────────────────────────────────────────────────
     from app.api.routes import api_router  # noqa: PLC0415

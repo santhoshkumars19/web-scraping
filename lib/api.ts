@@ -11,16 +11,43 @@
  * The backend also sets an HttpOnly cookie (leadscout_access_token) for cookie-based auth.
  */
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_BASE_URL = (() => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const isBrowser = typeof window !== "undefined";
+  const isBrowserRemote =
+    isBrowser &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1";
+
+  // When loaded in a remote browser (e.g. deployed on Railway or Vercel)
+  // and no public backend URL was provided (or it mistakenly still points to localhost),
+  // fall back to relative path ("") so requests go to the Next.js origin,
+  // which proxies them to the backend via next.config.ts rewrites!
+  if (isBrowserRemote) {
+    if (!envUrl || envUrl.includes("localhost") || envUrl.includes("127.0.0.1")) {
+      return "";
+    }
+    return envUrl.replace(/\/$/, "");
+  }
+
+  // Local development or SSR fallback
+  return envUrl ? envUrl.replace(/\/$/, "") : "http://localhost:8000";
+})();
 
 /**
  * Derive WebSocket URL from API base URL (http: -> ws:, https: -> wss:)
  */
 export function getWsUrl(path: string): string {
-  const base = API_BASE_URL.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${normalizedPath}`;
+  if (API_BASE_URL) {
+    const base = API_BASE_URL.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
+    return `${base}${normalizedPath}`;
+  }
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${window.location.host}${normalizedPath}`;
+  }
+  return `ws://localhost:8000${normalizedPath}`;
 }
 
 // ─── Token Storage ────────────────────────────────────────────────────────────
@@ -234,11 +261,16 @@ export async function apiFetch<T = unknown>(
     if ((error as Error)?.name === "AbortError") {
       throw new ApiError("Request timed out. Please try again.", 408, "TIMEOUT");
     }
-    throw new ApiError(
-      (error as Error)?.message || "Network request failed. Please check your connection.",
-      0,
-      "NETWORK_ERROR"
-    );
+    const rawMsg = (error as Error)?.message || "";
+    const isFetchFailure =
+      rawMsg.toLowerCase().includes("failed to fetch") ||
+      rawMsg.toLowerCase().includes("networkerror") ||
+      rawMsg.toLowerCase().includes("load failed");
+    const userMessage = isFetchFailure
+      ? "Unable to connect to the backend server. If deployed, please ensure the backend service is running and NEXT_PUBLIC_API_URL is configured."
+      : rawMsg || "Network request failed. Please check your connection.";
+
+    throw new ApiError(userMessage, 0, "NETWORK_ERROR");
   }
 }
 
