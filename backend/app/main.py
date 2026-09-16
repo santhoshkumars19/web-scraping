@@ -287,6 +287,13 @@ def _register_exception_handlers(app: FastAPI) -> None:
         )
 
 
-# ─── Application instance ─────────────────────────────────────────────────────
-
 app = create_application()
+
+if __name__ == "__main__":
+    import os
+    import uvicorn
+
+    raw_port = os.getenv("PORT", "8000")
+    port = int(raw_port) if raw_port.isdigit() else 8000
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, log_level="info")
+
