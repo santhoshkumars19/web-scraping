@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
 
     # ── Database ───────────────────────────────────────────────────
-    DATABASE_URL: str
+    DATABASE_URL: str = "sqlite+aiosqlite:///./leadscout.db"
 
     # ── CORS ───────────────────────────────────────────────────────
     # Accepts a JSON array string from the env var, e.g.:
