@@ -19,6 +19,10 @@ import asyncio
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
 _sqlite_seq_lock = asyncio.Lock()
 _sqlite_seq_counter = 0
 
@@ -33,10 +37,23 @@ async def generate_task_id(session: AsyncSession) -> str:
     dialect_name = bind.dialect.name if bind else "postgresql"
 
     if dialect_name == "postgresql":
-        # Concurrency-safe PostgreSQL sequence
-        result = await session.execute(sa.text("SELECT nextval('task_id_seq')"))
-        seq_num = result.scalar()
-        return f"TASK-{int(seq_num):06d}"
+        try:
+            result = await session.execute(sa.text("SELECT nextval('task_id_seq')"))
+            seq_num = result.scalar()
+            if seq_num is not None:
+                return f"TASK-{int(seq_num):06d}"
+        except Exception as exc:
+            logger.warning("PostgreSQL task_id_seq query notice (%s); ensuring sequence exists...", exc)
+            try:
+                await session.execute(
+                    sa.text("CREATE SEQUENCE IF NOT EXISTS task_id_seq START WITH 1 INCREMENT BY 1;")
+                )
+                result = await session.execute(sa.text("SELECT nextval('task_id_seq')"))
+                seq_num = result.scalar()
+                if seq_num is not None:
+                    return f"TASK-{int(seq_num):06d}"
+            except Exception as e2:
+                logger.error("Sequence creation notice: %s; falling back to count query.", e2)
 
     # SQLite / in-memory test fallback using lock-protected monotonic sequence
     global _sqlite_seq_counter

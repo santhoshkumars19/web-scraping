@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
+import sqlalchemy as sa
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
@@ -60,6 +61,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         from app.db.base import Base
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            try:
+                await conn.execute(
+                    sa.text("CREATE SEQUENCE IF NOT EXISTS task_id_seq START WITH 1 INCREMENT BY 1;")
+                )
+            except Exception as seq_err:
+                logger.debug("Sequence auto-creation note: %s", seq_err)
         logger.info("Database schema verified / created successfully.")
     except Exception as dbe:
         logger.warning("Database schema creation notice: %s", dbe)
