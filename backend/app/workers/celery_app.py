@@ -50,12 +50,12 @@ celery_app.conf.update(
     task_default_routing_key="pipeline",
     task_routes={
         "app.workers.pipeline.run_scraping_pipeline": {"queue": "pipeline"},
-        "app.workers.tasks.run_discovery_task": {"queue": "discovery"},
-        "app.workers.tasks.run_official_website_task": {"queue": "discovery"},
-        "app.workers.tasks.run_crawl_task": {"queue": "crawl"},
-        "app.workers.tasks.run_extraction_task": {"queue": "extraction"},
-        "app.workers.tasks.run_cleaning_task": {"queue": "cleaning"},
-        "app.workers.tasks.run_verification_task": {"queue": "verification"},
+        "app.workers.tasks.run_discovery_task": {"queue": "pipeline"},
+        "app.workers.tasks.run_official_website_task": {"queue": "pipeline"},
+        "app.workers.tasks.run_crawl_task": {"queue": "pipeline"},
+        "app.workers.tasks.run_extraction_task": {"queue": "pipeline"},
+        "app.workers.tasks.run_cleaning_task": {"queue": "pipeline"},
+        "app.workers.tasks.run_verification_task": {"queue": "pipeline"},
         "app.workers.tasks.run_finalize_task": {"queue": "pipeline"},
     },
 )

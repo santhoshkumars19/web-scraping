@@ -17,7 +17,8 @@ if __name__ == "__main__":
     queues = "pipeline,discovery,crawl,extraction,cleaning,verification"
     argv = [
         "worker",
-        f"-Q={queues}",
+        "-Q",
+        queues,
         "--loglevel=INFO",
         "--pool=solo",
     ]
