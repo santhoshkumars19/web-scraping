@@ -16,6 +16,7 @@ from typing import Any, TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.exceptions import AppException
 from app.core.logging import get_logger
 from app.db.database import create_engine_and_factory, get_session_factory
@@ -157,7 +158,11 @@ async def _execute_stage_in_session(
 
         # ── 4. Execute the Service/Job Stage ──────────────────────────────────
         try:
-            result = await async_stage_fn(task_id, session=session)
+            stage_timeout = getattr(settings, "STAGE_TIMEOUT_SECONDS", 120.0)
+            result = await asyncio.wait_for(
+                async_stage_fn(task_id, session=session),
+                timeout=stage_timeout,
+            )
         except Exception as exc:
             logger.error(
                 "Stage '%s' failed for task %s: %s",

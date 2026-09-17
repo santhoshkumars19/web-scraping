@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     CELERY_RESULT_EXPIRES: int = 3600
     CELERY_WORKER_CONCURRENCY: int = 4
     CELERY_TASK_ALWAYS_EAGER: bool = False
+    STAGE_TIMEOUT_SECONDS: float = 120.0
 
     # ── Discovery Settings (Step 16A) ──────────────────────────────
     # When False, mock/fixture providers are completely disabled from normal scraping flows.

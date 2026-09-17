@@ -7,9 +7,13 @@ Celery application initialization, configuration, and queue routing for LeadScou
 from __future__ import annotations
 
 from celery import Celery
+from celery.signals import worker_ready
 from kombu import Exchange, Queue
 
 from app.core.config import settings
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 # ── Instantiate Celery ────────────────────────────────────────────────────────
 celery_app = Celery("leadscout")
@@ -62,3 +66,17 @@ celery_app.conf.update(
 
 # ── Auto-register worker modules ──────────────────────────────────────────────
 celery_app.autodiscover_tasks(["app.workers"])
+
+
+@worker_ready.connect
+def log_worker_startup_queues(sender: Any = None, **kwargs: Any) -> None:
+    """Log registered queues and task routes on worker startup."""
+    active_queues = [q.name for q in task_queues]
+    registered_tasks = sorted(list(celery_app.tasks.keys()))
+    logger.info(
+        "Celery worker ready. Broker: %s | Registered Queues: %s | Registered Tasks: %d",
+        settings.CELERY_BROKER_URL,
+        active_queues,
+        len(registered_tasks),
+    )
+
