@@ -101,16 +101,33 @@ async def dispose_engine() -> None:
         _engine = None
 
 
+import asyncio
+
+
 def get_session_factory() -> async_sessionmaker[AsyncSession]:
     """Return the module-level session factory.
 
-    Raises RuntimeError if the engine has not been initialised yet.
+    Initializes or re-initializes engine if uninitialized or if bound event loop is closed.
     """
-    if _async_session_factory is None:
-        raise RuntimeError(
-            "Database engine has not been initialised. "
-            "Call `create_engine_and_factory()` during application startup."
-        )
+    global _engine, _async_session_factory
+
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+
+    if _async_session_factory is None or _engine is None:
+        create_engine_and_factory()
+    else:
+        engine_loop = getattr(getattr(_engine, "sync_engine", None), "_loop", None)
+        if current_loop and engine_loop and (engine_loop.is_closed() or engine_loop != current_loop):
+            logger.warning(
+                "AsyncEngine event loop closed or mismatched (engine_loop=%s, current_loop=%s). Re-creating engine.",
+                id(engine_loop),
+                id(current_loop),
+            )
+            create_engine_and_factory()
+
     return _async_session_factory
 
 

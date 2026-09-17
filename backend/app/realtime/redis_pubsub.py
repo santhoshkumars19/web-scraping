@@ -8,6 +8,7 @@ to task event channels across process and server boundaries.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any, AsyncGenerator
 
@@ -35,6 +36,16 @@ class RedisPubSub:
         self._sync_redis: redis.Redis | None = None
 
     def _get_async_client(self) -> aioredis.Redis:
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
+        if self._async_redis is not None:
+            client_loop = getattr(self._async_redis, "_loop", None)
+            if current_loop and client_loop and (client_loop.is_closed() or client_loop != current_loop):
+                self._async_redis = None
+
         if self._async_redis is None:
             self._async_redis = aioredis.from_url(
                 self.redis_url,

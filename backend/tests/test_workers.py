@@ -461,3 +461,86 @@ async def test_run_pipeline_cli_runner(db_session: AsyncSession, monkeypatch, ca
     assert "Task ID: TASK-CLI-PIPE" in captured
     assert "Celery Job ID: mock-celery-chain-uuid-999" in captured
     assert "Queue: pipeline" in captured
+
+
+# ── 10. Event Loop Mismatch & Sequential Tasks Regression Tests ────────────────
+
+
+def test_worker_persistent_event_loop_multi_stage_no_closed_loop_error(monkeypatch):
+    """Verify that multiple worker stage calls reuse the persistent event loop cleanly."""
+    from app.workers.task_context import get_worker_loop, run_async
+
+    loop1 = get_worker_loop()
+    assert loop1 is not None
+    assert not loop1.is_closed()
+
+    async def sample_coro_1():
+        return "stage_1_done"
+
+    async def sample_coro_2():
+        return "stage_2_done"
+
+    res1 = run_async(sample_coro_1)
+    assert res1 == "stage_1_done"
+
+    loop2 = get_worker_loop()
+    assert loop2 is loop1
+    assert not loop2.is_closed()
+
+    res2 = run_async(sample_coro_2)
+    assert res2 == "stage_2_done"
+
+
+@pytest.mark.asyncio
+async def test_two_sequential_tasks_same_worker_process(db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch):
+    """Verify executing two sequential Celery scraping tasks in the same worker process."""
+    class TestContext:
+        async def __aenter__(self):
+            return db_session
+
+        async def __aexit__(self, *args):
+            pass
+
+    factory_fn = lambda: lambda: TestContext()
+    monkeypatch.setattr("app.workers.task_context.get_session_factory", factory_fn)
+    monkeypatch.setattr("app.jobs.official_website_job.get_session_factory", factory_fn)
+    monkeypatch.setattr("app.db.database.get_session_factory", factory_fn)
+
+    user = User(name="Seq User", email="seq_tasks@example.com", password_hash="hash")
+    db_session.add(user)
+    await db_session.commit()
+
+    task1 = ScrapingTask(
+        task_id="TASK-SEQ-001",
+        user_id=user.id,
+        keyword="Restaurants",
+        location="Ooty",
+        status="PENDING",
+    )
+    task2 = ScrapingTask(
+        task_id="TASK-SEQ-002",
+        user_id=user.id,
+        keyword="Hotels",
+        location="Coimbatore",
+        status="PENDING",
+    )
+    db_session.add_all([task1, task2])
+    await db_session.commit()
+
+    celery_app.conf.task_always_eager = True
+    from app.workers.tasks import run_discovery_task, run_official_website_task
+
+    # Run stage tasks for Task 1
+    res1_disc = run_discovery_task.apply(args=["TASK-SEQ-001"])
+    assert res1_disc.status == "SUCCESS"
+
+    res1_web = run_official_website_task.apply(args=["TASK-SEQ-001"])
+    assert res1_web.status == "SUCCESS"
+
+    # Run stage tasks for Task 2 in the exact same worker process
+    res2_disc = run_discovery_task.apply(args=["TASK-SEQ-002"])
+    assert res2_disc.status == "SUCCESS"
+
+    res2_web = run_official_website_task.apply(args=["TASK-SEQ-002"])
+    assert res2_web.status == "SUCCESS"
+

@@ -39,11 +39,26 @@ class TaskAlreadyFailedException(Exception):
     pass
 
 
-def run_async(coro_fn: Callable[..., Coroutine[Any, Any, T]], *args: Any, **kwargs: Any) -> T:
-    """Execute an async coroutine safely from a synchronous context.
+import threading
 
-    Handles existing running event loops (e.g. eager tests) via a background thread.
+_worker_loop: asyncio.AbstractEventLoop | None = None
+
+
+def get_worker_loop() -> asyncio.AbstractEventLoop:
+    """Return a process-local persistent event loop for Celery tasks.
+
+    Prevents creating and closing event loops per stage while reusing the
+    shared SQLAlchemy AsyncEngine / asyncpg connection pool.
     """
+    global _worker_loop
+    if _worker_loop is None or _worker_loop.is_closed():
+        _worker_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_worker_loop)
+    return _worker_loop
+
+
+def run_async(coro_fn: Callable[..., Coroutine[Any, Any, T]], *args: Any, **kwargs: Any) -> T:
+    """Execute an async coroutine safely from a synchronous context using the persistent worker loop."""
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -53,7 +68,8 @@ def run_async(coro_fn: Callable[..., Coroutine[Any, Any, T]], *args: Any, **kwar
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             return pool.submit(asyncio.run, coro_fn(*args, **kwargs)).result()
     else:
-        return asyncio.run(coro_fn(*args, **kwargs))
+        worker_loop = get_worker_loop()
+        return worker_loop.run_until_complete(coro_fn(*args, **kwargs))
 
 
 async def _execute_stage_in_session(
@@ -62,6 +78,15 @@ async def _execute_stage_in_session(
     stage_name: str,
 ) -> dict[str, Any]:
     """Internal async runner executing a pipeline stage within an isolated DB session."""
+    active_loop = asyncio.get_running_loop()
+    logger.info(
+        "[%s] worker_loop_id=%s, stage=%s, thread_id=%s",
+        task_id,
+        id(active_loop),
+        stage_name,
+        threading.get_ident(),
+    )
+
     try:
         factory = get_session_factory()
     except RuntimeError:
