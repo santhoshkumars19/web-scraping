@@ -62,7 +62,7 @@ async def test_real_celery_pipeline_e2e(db_session: AsyncSession, monkeypatch: p
             location="Ooty",
             keyword="Restaurants",
             search_radius=25,
-            max_results=3,
+            max_results=25,
             max_pages_per_site=5,
             selected_fields=["NAME", "PHONE", "EMAIL", "ADDRESS", "WEBSITE"],
         )
