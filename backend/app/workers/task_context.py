@@ -196,26 +196,31 @@ async def _execute_stage_in_session(
                 exc,
                 exc_info=True,
             )
-            task.status = "FAILED"
-            task.failure_reason = f"Stage '{stage_name}' failed: {exc}"
-            session.add(
-                ScrapingLog(
-                    task_id=task.id,
-                    level="ERROR",
-                    event_type="PIPELINE_STAGE_FAILED",
-                    message=f"Pipeline stage '{stage_name}' failed for task {task_id}: {exc}",
+            from redis.exceptions import RedisError
+            from sqlalchemy.exc import OperationalError
+
+            is_transient = isinstance(exc, (OperationalError, ConnectionError, TimeoutError, RedisError))
+            if not is_transient:
+                task.status = "FAILED"
+                task.failure_reason = f"Stage '{stage_name}' failed: {exc}"
+                session.add(
+                    ScrapingLog(
+                        task_id=task.id,
+                        level="ERROR",
+                        event_type="PIPELINE_STAGE_FAILED",
+                        message=f"Pipeline stage '{stage_name}' failed for task {task_id}: {exc}",
+                    )
                 )
-            )
-            await session.commit()
-            try:
-                from app.realtime.publisher import get_event_publisher
-                await get_event_publisher().publish_failed(
-                    task_id,
-                    stage=stage_name,
-                    reason=f"Stage '{stage_name}' failed: {exc}",
-                )
-            except Exception as pe:
-                logger.debug("Realtime publish failed for task %s failed event: %s", task_id, pe)
+                await session.commit()
+                try:
+                    from app.realtime.publisher import get_event_publisher
+                    await get_event_publisher().publish_failed(
+                        task_id,
+                        stage=stage_name,
+                        reason=f"Stage '{stage_name}' failed: {exc}",
+                    )
+                except Exception as pe:
+                    logger.debug("Realtime publish failed for task %s failed event: %s", task_id, pe)
             raise
 
         # ── 5. Stage Completed Log ────────────────────────────────────────────

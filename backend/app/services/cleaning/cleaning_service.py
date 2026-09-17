@@ -213,22 +213,7 @@ class CleaningService:
                     org_b = active_orgs[j]
                     match_result = OrganizationMatcher.match(org_a, org_b)
 
-                    if match_result.is_potential:
-                        potential_duplicates_flagged += 1
-                        self.session.add(
-                            ScrapingLog(
-                                task_id=task.id,
-                                organization_id=org_a.id,
-                                level="WARNING",
-                                event_type="POTENTIAL_DUPLICATE",
-                                message=(
-                                    f"Potential duplicate detected between '{org_a.name}' and '{org_b.name}' "
-                                    f"(score {match_result.score}): {'; '.join(match_result.reasons)}"
-                                ),
-                            )
-                        )
-
-                    elif match_result.is_duplicate:
+                    if match_result.is_duplicate:
                         merge_res = await MergeService.merge_organizations(
                             session=self.session,
                             org1=org_a,
@@ -256,6 +241,29 @@ class CleaningService:
                         break
                 if merged_any:
                     break
+
+        # Log potential duplicates among surviving organizations post-merge
+        final_orgs = list((await self.session.execute(stmt_orgs)).scalars().all())
+        num_final = len(final_orgs)
+        for i in range(num_final):
+            for j in range(i + 1, num_final):
+                org_a = final_orgs[i]
+                org_b = final_orgs[j]
+                match_result = OrganizationMatcher.match(org_a, org_b)
+                if match_result.is_potential:
+                    potential_duplicates_flagged += 1
+                    self.session.add(
+                        ScrapingLog(
+                            task_id=task.id,
+                            organization_id=org_a.id,
+                            level="WARNING",
+                            event_type="POTENTIAL_DUPLICATE",
+                            message=(
+                                f"Potential duplicate detected between '{org_a.name}' and '{org_b.name}' "
+                                f"(score {match_result.score}): {'; '.join(match_result.reasons)}"
+                            ),
+                        )
+                    )
 
         # ── Phase 3: Lead Deduplication for Task ───────────────────────────────
         stmt_leads = select(Lead).where(Lead.task_id == task.id)

@@ -232,6 +232,11 @@ class MergeService:
         for sl in (await session.execute(stmt_sl)).scalars().all():
             sl.organization_id = canonical_id
 
+        # Also update any pending uncommitted ScrapingLog objects in session.new
+        for obj in list(session.new):
+            if isinstance(obj, ScrapingLog) and getattr(obj, "organization_id", None) == source_id:
+                obj.organization_id = canonical_id
+
         # ── 10. Re-link Task Organizations (M2M) ──────────────────────────────
         stmt_c_tasks = select(task_organizations.c.task_id).where(
             task_organizations.c.organization_id == canonical_id
@@ -297,13 +302,8 @@ class MergeService:
         session.add(merge_event)
 
         # ── 14. Delete Duplicate Source Organization ──────────────────────────
-        for rel in [
-            "websites", "contacts", "phone_numbers", "email_addresses",
-            "social_links", "source_pages", "leads", "tasks"
-        ]:
-            if rel in source_org.__dict__:
-                source_org.__dict__[rel].clear()
-
+        # Do not call .clear() on delete-orphan relationships because re-parented children
+        # now belong to canonical_id. Simply delete the source organization object.
         await session.delete(source_org)
         await session.flush()
 

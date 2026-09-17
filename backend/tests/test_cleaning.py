@@ -588,3 +588,77 @@ async def test_run_cleaning_cli_runner(monkeypatch, capsys, db_session: AsyncSes
     assert "Organizations Merged: 0" in captured
     assert "Status: Cleaning completed" in captured
     assert "Next Stage: VERIFYING" in captured
+
+
+# ── 14. Regression Test: Cleaning with Merges & Potential Duplicates ─────────
+
+
+@pytest.mark.asyncio
+async def test_cleaning_service_with_merges_and_potential_duplicates(db_session: AsyncSession):
+    """Verify that org merging and potential duplicate logging execute cleanly without FK/cascade errors."""
+    user = User(
+        id=uuid.uuid4(),
+        name="User Merge Potential",
+        email=f"mp_{uuid.uuid4().hex[:6]}@leadscout.app",
+        password_hash="hash",
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    task = ScrapingTask(
+        task_id="TASK-MERGE-POTENTIAL-01",
+        user_id=user.id,
+        keyword="Restaurants",
+        location="Ooty",
+        status="RUNNING",
+        current_stage="EXTRACTING",
+        progress=70,
+    )
+    db_session.add(task)
+    await db_session.flush()
+
+    # Org 1 & Org 2 match as duplicate (shared domain & phone)
+    org1 = Organization(name="Savoy Restaurant Ooty", city="Ooty", address="77 Church Hill Rd")
+    org2 = Organization(name="Savoy Restaurant Ooty Pvt Ltd", city="Ooty", address="77 Church Hill Road")
+    # Org 3 matches Org 1 as potential duplicate (similar name, same city, no shared domain)
+    org3 = Organization(name="Savoy Cafe and Dining", city="Ooty", address="Church Hill Road Area")
+
+    db_session.add_all([org1, org2, org3])
+    await db_session.flush()
+
+    w1 = Website(organization_id=org1.id, url="https://savoyooty.example", normalized_url="https://savoyooty.example", is_official=True)
+    p1 = PhoneNumber(organization_id=org1.id, phone_number="9876543210", normalized_phone="+919876543210")
+
+    w2 = Website(organization_id=org2.id, url="https://savoyooty.example/contact", normalized_url="https://savoyooty.example/contact")
+    p2 = PhoneNumber(organization_id=org2.id, phone_number="9876543210", normalized_phone="+919876543210")
+
+    w3 = Website(organization_id=org3.id, url="https://savoycafe.example", normalized_url="https://savoycafe.example")
+    p3 = PhoneNumber(organization_id=org3.id, phone_number="9112233445", normalized_phone="+919112233445")
+
+    db_session.add_all([w1, p1, w2, p2, w3, p3])
+    await db_session.flush()
+
+    await db_session.execute(task_organizations.insert().values([
+        {"task_id": task.id, "organization_id": org1.id},
+        {"task_id": task.id, "organization_id": org2.id},
+        {"task_id": task.id, "organization_id": org3.id},
+    ]))
+    db_session.add_all([
+        Lead(task_id=task.id, organization_id=org1.id),
+        Lead(task_id=task.id, organization_id=org2.id),
+        Lead(task_id=task.id, organization_id=org3.id),
+    ])
+    await db_session.flush()
+
+    service = CleaningService(db_session)
+    result = await service.clean_task(task.task_id)
+
+    assert result.status == "Cleaning completed"
+    assert result.next_stage == "VERIFYING"
+    assert result.organizations_merged == 1
+
+    await db_session.refresh(task)
+    assert task.current_stage == "VERIFYING"
+    assert task.progress == 85
+    assert task.status == "RUNNING"
+
