@@ -339,14 +339,46 @@ export function useTaskProgress(taskId: string): UseTaskProgressReturn {
 
   // ── 3. Fallback Polling when WebSocket is Disconnected ───────────────────────
   useEffect(() => {
-    // If WS is down and task is in-flight, poll every 12 seconds
-    if (!isWsConnected && task && (task.status === "RUNNING" || task.status === "PENDING")) {
-      pollTimerRef.current = setInterval(async () => {
+    // Poll fast (every 2 seconds) whenever WS is not connected and task is active
+    const isTaskActive = task && (task.status === "RUNNING" || task.status === "PENDING");
+
+    if (!isWsConnected && isTaskActive) {
+      const pollTask = async () => {
         try {
           const res = await tasksApi.getTask(taskId);
-          setTask((prev) => mapBackendDetailToTaskProgress(res.data, prev));
+          const newDetail = res.data;
+          setTask((prev) => {
+            if (prev && newDetail.current_stage && newDetail.current_stage !== prev.currentStage) {
+              appendActivity({
+                id: `stage-${newDetail.current_stage}-${Date.now()}`,
+                timestamp: new Date().toLocaleTimeString("en-US", { hour12: false }),
+                message: `Stage transitioned to ${newDetail.current_stage}`,
+                type: "info",
+              });
+            }
+            if (prev && newDetail.status === "COMPLETED" && prev.status !== "COMPLETED") {
+              appendActivity({
+                id: `comp-${Date.now()}`,
+                timestamp: new Date().toLocaleTimeString("en-US", { hour12: false }),
+                message: "Scraping pipeline finished successfully. All leads verified and ready.",
+                type: "success",
+              });
+            }
+            if (prev && newDetail.status === "FAILED" && prev.status !== "FAILED") {
+              appendActivity({
+                id: `fail-${Date.now()}`,
+                timestamp: new Date().toLocaleTimeString("en-US", { hour12: false }),
+                message: `Task failed: ${newDetail.failure_reason || "Pipeline error"}`,
+                type: "error",
+              });
+            }
+            return mapBackendDetailToTaskProgress(newDetail, prev);
+          });
         } catch {}
-      }, 12000);
+      };
+
+      pollTask();
+      pollTimerRef.current = setInterval(pollTask, 2000);
     } else {
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     }
@@ -354,7 +386,7 @@ export function useTaskProgress(taskId: string): UseTaskProgressReturn {
     return () => {
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     };
-  }, [isWsConnected, task?.status, taskId]);
+  }, [isWsConnected, task?.status, taskId, appendActivity]);
 
   // ── 4. Actions ─────────────────────────────────────────────────────────────
   const cancelTask = useCallback(() => {
