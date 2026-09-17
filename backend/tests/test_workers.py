@@ -67,13 +67,15 @@ def test_celery_queue_definitions_and_routing():
     assert expected_queues.issubset(queues)
 
     routes = celery_app.conf.task_routes
-    assert routes["app.workers.tasks.run_discovery_task"]["queue"] == "discovery"
-    assert routes["app.workers.tasks.run_crawl_task"]["queue"] == "crawl"
-    assert routes["app.workers.tasks.run_extraction_task"]["queue"] == "extraction"
-    assert routes["app.workers.tasks.run_cleaning_task"]["queue"] == "cleaning"
-    assert routes["app.workers.tasks.run_verification_task"]["queue"] == "verification"
+    assert routes["app.workers.tasks.run_discovery_task"]["queue"] == "pipeline"
+    assert routes["app.workers.tasks.run_official_website_task"]["queue"] == "pipeline"
+    assert routes["app.workers.tasks.run_crawl_task"]["queue"] == "pipeline"
+    assert routes["app.workers.tasks.run_extraction_task"]["queue"] == "pipeline"
+    assert routes["app.workers.tasks.run_cleaning_task"]["queue"] == "pipeline"
+    assert routes["app.workers.tasks.run_verification_task"]["queue"] == "pipeline"
     assert routes["app.workers.tasks.run_finalize_task"]["queue"] == "pipeline"
     assert routes["app.workers.pipeline.run_scraping_pipeline"]["queue"] == "pipeline"
+
 
 
 def test_registered_tasks():
