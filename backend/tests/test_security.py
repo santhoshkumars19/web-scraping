@@ -87,6 +87,27 @@ def test_ssrf_allows_legitimate_public_urls() -> None:
 
 
 @pytest.mark.asyncio
+async def test_ssrf_async_dns_timeout() -> None:
+    """Async SSRF validator must raise SsrfBlockedError on DNS resolution timeout without hanging."""
+    from app.utils.ssrf import validate_url_for_ssrf_async
+
+    with patch("asyncio.get_running_loop") as mock_loop_fn:
+        mock_loop = AsyncMock()
+
+        async def hanging_getaddrinfo(*args, **kwargs):
+            await asyncio.sleep(5.0)
+
+        mock_loop.getaddrinfo = hanging_getaddrinfo
+        mock_loop_fn.return_value = mock_loop
+
+        with pytest.raises(SsrfBlockedError) as exc_info:
+            await validate_url_for_ssrf_async("https://unresponsive-dns.unresponsive-server-host.org", dns_timeout=0.05)
+
+        assert "DNS resolution timed out" in str(exc_info.value)
+
+
+
+@pytest.mark.asyncio
 async def test_http_crawler_aborts_on_ssrf_target() -> None:
     """HttpCrawler must immediately raise CrawlerError with code SSRF_BLOCKED for loopback."""
     crawler = HttpCrawler()

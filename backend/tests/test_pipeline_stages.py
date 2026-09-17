@@ -241,3 +241,96 @@ async def test_task_types_multiple_progress_beyond_15(db_session: AsyncSession) 
         assert t_after_web.progress == 30
         assert t_after_web.current_stage == "CRAWLING"
         assert t_after_web.progress > 15, f"Task {task.task_id} failed to move beyond 15%"
+
+
+@pytest.mark.asyncio
+async def test_dns_timeout_and_bad_candidate_isolation(db_session: AsyncSession) -> None:
+    """Regression test: A candidate hostname that times out on DNS or throws an error
+    must be marked unreachable without blocking the pipeline, preventing other candidates
+    from being processed, or leaving the task stuck at 20%.
+    """
+    from app.services.discovery.website_validator import WebsiteReachabilityResult
+
+    user = User(
+        name="Isolation User",
+        email=f"iso_{uuid.uuid4().hex[:6]}@example.com",
+        password_hash="hash",
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    task = ScrapingTask(
+        task_id=f"TASK-ISO-{uuid.uuid4().hex[:4].upper()}",
+        user_id=user.id,
+        location="Ooty",
+        keyword="Restaurants",
+        status="RUNNING",
+        current_stage="FINDING_WEBSITES",
+        progress=20,
+    )
+    db_session.add(task)
+    await db_session.flush()
+
+    # Candidate 1: Has website URL that will fail DNS / timeout
+    org1 = Organization(name="Hanging DNS Cafe", city="Ooty")
+    db_session.add(org1)
+    await db_session.flush()
+    await db_session.execute(
+        task_organizations.insert().values(task_id=task.id, organization_id=org1.id)
+    )
+
+    # Candidate 2: Normal valid candidate
+    org2 = Organization(name="Good Bistro", city="Ooty")
+    db_session.add(org2)
+    await db_session.flush()
+    await db_session.execute(
+        task_organizations.insert().values(task_id=task.id, organization_id=org2.id)
+    )
+
+    site2 = Website(
+        organization_id=org2.id,
+        url="https://goodbistro.example",
+        normalized_url="https://goodbistro.example",
+        domain="goodbistro.example",
+        status="PENDING",
+        is_official=True,
+    )
+    db_session.add(site2)
+
+    await db_session.commit()
+
+    # Mock validate_website_reachability to simulate candidate 1 DNS timeout and candidate 2 success
+    with patch("app.services.official_website_service.validate_website_reachability") as mock_val:
+        async def side_effect(url, **kwargs):
+            if "hanging" in url:
+                return WebsiteReachabilityResult(
+                    is_reachable=False,
+                    original_url=url,
+                    normalized_url=url,
+                    error="SSRF blocked: DNS resolution timed out for 'hanging.example'",
+                )
+            return WebsiteReachabilityResult(
+                is_reachable=True,
+                original_url=url,
+                normalized_url=url,
+                final_url=url,
+                http_status=200,
+                domain="goodbistro.example",
+            )
+
+        mock_val.side_effect = side_effect
+
+        service = OfficialWebsiteService(session=db_session)
+        result = await service.find_official_websites_for_task(task.task_id)
+
+        assert result["total_candidates"] == 2
+        assert result["websites_found"] == 1
+        assert result["next_stage"] == "CRAWLING"
+
+        # Verify task moved from 20% to 30% and current_stage became CRAWLING
+        stmt_t = select(ScrapingTask).where(ScrapingTask.id == task.id)
+        refreshed_task = (await db_session.execute(stmt_t)).scalar_one()
+        assert refreshed_task.current_stage == "CRAWLING"
+        assert refreshed_task.progress == 30
+        assert refreshed_task.websites_found == 1
+

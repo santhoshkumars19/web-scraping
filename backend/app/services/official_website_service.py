@@ -6,15 +6,15 @@ discovered in Step 2, moving the pipeline through Step 3 ("Finding official webs
 
 Features:
   • Queries candidate organizations for a task
-  • Validates candidate URLs using bounded HTTP reachability probes
+  • Validates candidate URLs using bounded async HTTP reachability probes and bounded non-blocking DNS
+  • Bounded concurrency via Semaphore to prevent event loop or threadpool starvation
   • Isolates individual probe failures without stalling the stage
   • Structured logging matching platform event standards:
-      - official_website_stage_started
-      - candidate_count
       - candidate_processing_started
+      - dns_validation_started / dns_validation_completed
+      - probe_started / probe_completed
+      - official_website_found / official_website_not_found
       - candidate_processing_completed
-      - official_website_found
-      - official_website_not_found
       - official_website_stage_completed
       - crawl_stage_queued
   • Monotonic progress advancement: 20% -> 30%
@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -37,11 +36,12 @@ from app.core.exceptions import AppException
 from app.core.logging import get_logger
 from app.models.organization import Organization, task_organizations
 from app.models.scraping_log import ScrapingLog
-from app.models.scraping_task import ScrapingTask
 from app.models.website import Website
 from app.repositories.task_repository import TaskRepository
-from app.services.discovery.ranking import DIRECTORY_DOMAINS
-from app.services.discovery.website_validator import validate_website_reachability
+from app.services.discovery.website_validator import (
+    WebsiteReachabilityResult,
+    validate_website_reachability,
+)
 from app.utils.url import extract_domain, normalize_url
 
 logger = get_logger(__name__)
@@ -55,14 +55,7 @@ class OfficialWebsiteService:
         self.repository = TaskRepository(session)
 
     async def find_official_websites_for_task(self, task_id: str) -> dict[str, Any]:
-        """Identify, probe, and record official websites for all organizations in a task.
-
-        Args:
-            task_id: Human-readable task identifier (e.g. "TASK-000005").
-
-        Returns:
-            Dict summary of processed candidates and identified websites.
-        """
+        """Identify, probe, and record official websites for all organizations in a task."""
         start_time = time.monotonic()
         task = await self.repository.get_by_task_id(task_id)
         if task is None:
@@ -123,21 +116,108 @@ class OfficialWebsiteService:
         )
         await self.session.commit()
 
-        # ── 3. Check Existing Websites & Probe Missing Candidate Websites ─────
-        websites_found_count = 0
+        # Pre-fetch existing websites for all candidate orgs
+        existing_sites_by_org_id = {}
+        if candidates:
+            stmt_sites = select(Website).where(Website.organization_id.in_([o.id for o in candidates]))
+            res_sites = await self.session.execute(stmt_sites)
+            existing_sites_by_org_id = {site.organization_id: site for site in res_sites.scalars().all()}
+
+        # ── 3. Concurrently Probe Candidate Websites ───────────────────────────
         reach_sem = asyncio.Semaphore(10)
         fixtures_enabled = getattr(settings, "DISCOVERY_ENABLE_FIXTURES", False)
-
-        # Configure bounded timeouts
         probe_timeout = httpx.Timeout(connect=3.0, read=4.0, write=3.0, pool=3.0)
 
-        for idx, org in enumerate(candidates, start=1):
+        async def _probe_candidate(
+            org_item: Organization, idx: int, shared_client: httpx.AsyncClient
+        ) -> tuple[Organization, str | None, str | None, bool, WebsiteReachabilityResult | None]:
             logger.info(
                 "[%s] candidate_processing_started: candidate_id=%s, organization_name=%s",
                 task.task_id,
-                org.id,
-                org.name,
+                org_item.id,
+                org_item.name,
             )
+
+            existing_web = existing_sites_by_org_id.get(org_item.id)
+            if existing_web:
+                logger.info(
+                    "[%s] candidate_processing_completed: candidate_id=%s",
+                    task.task_id,
+                    org_item.id,
+                )
+                return org_item, existing_web.url, existing_web.domain, existing_web.is_official, None
+
+            cand_url = getattr(org_item, "website", None) or getattr(org_item, "url", None) or ""
+            cand_url_str = cand_url.strip() if isinstance(cand_url, str) else ""
+
+            if not cand_url_str or cand_url_str.startswith("https://www.openstreetmap.org"):
+                logger.info(
+                    "[%s] candidate_processing_completed: candidate_id=%s",
+                    task.task_id,
+                    org_item.id,
+                )
+                return org_item, None, None, False, None
+
+            if fixtures_enabled and (cand_url_str.startswith("fixture://") or cand_url_str.endswith(".example")):
+                logger.info(
+                    "[%s] candidate_processing_completed: candidate_id=%s",
+                    task.task_id,
+                    org_item.id,
+                )
+                return org_item, cand_url_str, extract_domain(cand_url_str), True, None
+
+            url_to_save: str | None = None
+            domain_to_save: str | None = None
+            official_flag = False
+            reach_res: WebsiteReachabilityResult | None = None
+
+            try:
+                async with reach_sem:
+                    reach_res = await validate_website_reachability(
+                        cand_url_str,
+                        timeout=4.0,
+                        dns_timeout=3.0,
+                        client=shared_client,
+                        task_id=task.task_id,
+                    )
+                    if reach_res and reach_res.is_reachable:
+                        url_to_save = reach_res.final_url or reach_res.normalized_url
+                        domain_to_save = reach_res.domain
+                        official_flag = True
+            except Exception as probe_err:
+                logger.debug(
+                    "[%s] Probe error for %s: %s",
+                    task.task_id,
+                    cand_url_str,
+                    probe_err,
+                )
+
+            logger.info(
+                "[%s] candidate_processing_completed: candidate_id=%s",
+                task.task_id,
+                org_item.id,
+            )
+            return org_item, url_to_save, domain_to_save, official_flag, reach_res
+
+        probe_results: list[tuple[Organization, str | None, str | None, bool, Any]] = []
+        if candidates:
+            async with httpx.AsyncClient(
+                headers={"User-Agent": settings.CRAWLER_USER_AGENT},
+                timeout=probe_timeout,
+                follow_redirects=True,
+            ) as probe_client:
+                probe_futures = [_probe_candidate(org, idx, probe_client) for idx, org in enumerate(candidates, start=1)]
+                probe_results = list(await asyncio.gather(*probe_futures, return_exceptions=True))
+
+        # ── 4. Persist Results & Update Progress ──────────────────────────────
+        websites_found_count = 0
+
+        for idx, item in enumerate(probe_results, start=1):
+            if isinstance(item, Exception) or not isinstance(item, tuple):
+                continue
+
+            org, website_url_to_save, website_domain, is_official, reach_res = item
+
             self.session.add(
                 ScrapingLog(
                     task_id=task.id,
@@ -147,54 +227,6 @@ class OfficialWebsiteService:
                     message=f"Processing candidate organization '{org.name}' ({idx}/{total_candidates}).",
                 )
             )
-
-            # Check if organization already has an official or pending website attached
-            stmt_site = select(Website).where(Website.organization_id == org.id)
-            res_site = await self.session.execute(stmt_site)
-            existing_website = res_site.scalar_one_or_none()
-
-            website_url_to_save: str | None = None
-            website_domain: str | None = None
-            is_official = False
-
-            if existing_website:
-                website_url_to_save = existing_website.url
-                website_domain = existing_website.domain
-                is_official = existing_website.is_official
-            else:
-                # If organization has a website candidate URL in its raw data or name search
-                cand_url = getattr(org, "website", None) or getattr(org, "url", None) or ""
-                cand_url_str = cand_url.strip() if isinstance(cand_url, str) else ""
-
-                if cand_url_str and not cand_url_str.startswith("https://www.openstreetmap.org"):
-                    if fixtures_enabled and (cand_url_str.startswith("fixture://") or cand_url_str.endswith(".example")):
-                        website_url_to_save = cand_url_str
-                        website_domain = extract_domain(cand_url_str)
-                        is_official = True
-                    else:
-                        try:
-                            async with reach_sem:
-                                async with httpx.AsyncClient(
-                                    headers={"User-Agent": settings.CRAWLER_USER_AGENT},
-                                    timeout=probe_timeout,
-                                    follow_redirects=True,
-                                ) as client:
-                                    reach_res = await validate_website_reachability(
-                                        cand_url_str,
-                                        timeout=4.0,
-                                        client=client,
-                                    )
-                                    if reach_res and reach_res.is_reachable:
-                                        website_url_to_save = reach_res.final_url or reach_res.normalized_url
-                                        website_domain = reach_res.domain
-                                        is_official = True
-                        except Exception as probe_err:
-                            logger.debug(
-                                "[%s] Probe error for %s: %s",
-                                task.task_id,
-                                cand_url_str,
-                                probe_err,
-                            )
 
             if website_url_to_save:
                 norm_site_url = normalize_url(website_url_to_save)
@@ -253,11 +285,6 @@ class OfficialWebsiteService:
                     )
                 )
 
-            logger.info(
-                "[%s] candidate_processing_completed: candidate_id=%s",
-                task.task_id,
-                org.id,
-            )
             self.session.add(
                 ScrapingLog(
                     task_id=task.id,
@@ -268,14 +295,13 @@ class OfficialWebsiteService:
                 )
             )
 
-            # Incremental progress between 20% and 30%
             if total_candidates > 0:
                 fraction = idx / total_candidates
                 task.progress = min(30, 20 + int(fraction * 10))
 
-            await self.session.commit()
+        await self.session.commit()
 
-        # ── 4. Finalize Official Website Stage ────────────────────────────────
+        # ── 5. Finalize Official Website Stage ────────────────────────────────
         task.websites_found = websites_found_count
         task.progress = 30
         task.current_stage = "CRAWLING"

@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.core.logging import get_logger
-from app.utils.ssrf import validate_url_for_ssrf, SsrfBlockedError
+from app.utils.ssrf import validate_url_for_ssrf_async, SsrfBlockedError
 from app.utils.url import extract_domain, normalize_url
 
 logger = get_logger(__name__)
@@ -48,14 +48,16 @@ async def validate_website_reachability(
     url: str,
     *,
     timeout: float = 8.0,
+    dns_timeout: float = 3.0,
     client: httpx.AsyncClient | None = None,
+    task_id: str | None = None,
 ) -> WebsiteReachabilityResult:
     """Validate that a URL is a syntactically valid, safe, and reachable public website.
 
     Rules:
       1. Normalize URL and ensure http/https scheme.
       2. Strictly reject reserved/fictional domain extensions (.example, etc.).
-      3. Verify against SSRF rules (disallow private IP subnets, metadata endpoints).
+      3. Verify against SSRF rules (disallow private IP subnets, metadata endpoints, DNS timeouts).
       4. Make a lightweight probe (HEAD with fallback to GET) to confirm the site responds.
       5. Capture and return the final redirected URL and HTTP status code.
     """
@@ -96,7 +98,7 @@ async def validate_website_reachability(
 
     # 4. SSRF Validation
     try:
-        validate_url_for_ssrf(norm_url)
+        await validate_url_for_ssrf_async(norm_url, dns_timeout=dns_timeout, task_id=task_id)
     except SsrfBlockedError as exc:
         return WebsiteReachabilityResult(
             is_reachable=False,
@@ -120,6 +122,9 @@ async def validate_website_reachability(
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     }
 
+    tid_str = f"[{task_id}] " if task_id else ""
+    logger.info("%sprobe_started: url=%s", tid_str, norm_url)
+
     async def _probe(c: httpx.AsyncClient) -> WebsiteReachabilityResult:
         try:
             # Try HEAD first for minimal overhead
@@ -135,6 +140,13 @@ async def validate_website_reachability(
 
             # HTTP 200–399 are reachable. 403/401 is also reachable (server exists, protected/WAF)
             is_reachable = status < 500 or status in (401, 403)
+            logger.info(
+                "%sprobe_completed: url=%s, status=%s, reachable=%s",
+                tid_str,
+                norm_url,
+                status,
+                is_reachable,
+            )
             return WebsiteReachabilityResult(
                 is_reachable=is_reachable,
                 original_url=raw_url,
@@ -145,6 +157,12 @@ async def validate_website_reachability(
                 error=None if is_reachable else f"HTTP error {status}",
             )
         except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout) as e:
+            logger.info(
+                "%sprobe_completed: url=%s, reachable=False, error=%s",
+                tid_str,
+                norm_url,
+                e,
+            )
             return WebsiteReachabilityResult(
                 is_reachable=False,
                 original_url=raw_url,
@@ -153,6 +171,12 @@ async def validate_website_reachability(
                 error=f"Connection failed: {e}",
             )
         except Exception as e:
+            logger.info(
+                "%sprobe_completed: url=%s, reachable=False, error=%s",
+                tid_str,
+                norm_url,
+                e,
+            )
             return WebsiteReachabilityResult(
                 is_reachable=False,
                 original_url=raw_url,
